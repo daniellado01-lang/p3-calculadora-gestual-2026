@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src/gest-calc"))
-from gestures import PinchSelector, pinch_ratio
+from gestures import DwellSelector, PinchSelector, pinch_ratio
 
 
 class GestureTests(unittest.TestCase):
@@ -58,6 +58,26 @@ class GestureTests(unittest.TestCase):
         self.assertAlmostEqual(pinch_ratio(landmarks, 640, 480), .2)
         self.assertAlmostEqual(pinch_ratio(landmarks, 1280, 960), .2)
         self.assertIsNone(pinch_ratio(landmarks, 10, 10))
+
+
+class DwellTests(unittest.TestCase):
+    def test_selection_and_no_repeat(self):
+        selector = DwellSelector()
+        self.assertIsNone(selector.update("2", .8, 0))
+        self.assertIsNone(selector.update("2", .8, .5))
+        self.assertEqual(selector.update("2", .8, 1.1), "2")
+        self.assertIsNone(selector.update("2", .8, 3))
+        selector.update(None, .8, 4)
+        selector.update("2", .8, 5)
+        self.assertEqual(selector.update("2", .8, 6.1), "2")
+
+    def test_change_or_loss_cancels_countdown(self):
+        selector = DwellSelector()
+        selector.update("2", .8, 0)
+        self.assertIsNone(selector.update("3", .8, .9))
+        self.assertIsNone(selector.update("3", .8, 1.1))
+        selector.update(None, None, 1.2)
+        self.assertIsNone(selector.update("3", .8, 3))
 
 
 if __name__ == "__main__":

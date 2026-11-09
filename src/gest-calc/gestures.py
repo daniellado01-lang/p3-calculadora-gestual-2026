@@ -67,3 +67,35 @@ class PinchSelector:
         else:
             self.pinch_since = None
         return None
+
+
+class DwellSelector:
+    """Confirma al permanecer sobre una tecla; exige salir antes de repetir."""
+    def __init__(self, dwell_time=1.0):
+        self.dwell_time = dwell_time
+        self.reset()
+
+    def reset(self):
+        self.target = None
+        self.since = None
+        self.locked = False
+        self.progress = 0.0
+        self.status = "Apunta a una tecla durante 1 segundo"
+
+    def update(self, target, ratio, now):
+        if target is None or ratio is None:
+            self.reset()
+            return None
+        if target != self.target:
+            self.target, self.since, self.locked = target, now, False
+        if self.locked:
+            self.progress = 0
+            self.status = "Aparta el indice de la tecla para repetir"
+            return None
+        self.progress = min(1.0, (now - self.since) / self.dwell_time)
+        self.status = "Manten el indice quieto sobre la tecla"
+        if self.progress >= 1:
+            self.locked = True
+            self.status = "Pulsado. Apunta a la siguiente tecla"
+            return target
+        return None

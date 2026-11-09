@@ -9,7 +9,7 @@ import mediapipe as mp
 import numpy as np
 
 from calculator import Calculator
-from gestures import PinchSelector, pinch_ratio
+from gestures import DwellSelector, PinchSelector, pinch_ratio
 
 WIDTH, HEIGHT = 1280, 720
 WINDOW = "Calculadora gestual"
@@ -47,7 +47,9 @@ def render(frame, calculator, buttons, selector, pointer=None, hover=None,
     cv2.rectangle(image, (800, 0), (WIDTH, HEIGHT), (29, 25, 22), -1)
     cv2.rectangle(image, (0, 0), (799, 94), (29, 25, 22), -1)
     text(image, "CALCULADORA GESTUAL", (26, 38), .85, thickness=2)
-    text(image, "1. Apunta   2. Junta pulgar e indice   3. Separa", (26, 73), .57)
+    dwell_mode = isinstance(selector, DwellSelector)
+    instruction = "APUNTAR: manten el indice 1 segundo sobre la tecla" if dwell_mode else "PINZA: apunta, junta pulgar e indice y separa"
+    text(image, instruction, (26, 73), .57)
     text(image, "OPERACION", (824, 36), .5, (173, 184, 194))
     cv2.rectangle(image, (824, 51), (1248, 195), (47, 43, 38), -1)
     previous = calculator.previous
@@ -89,7 +91,7 @@ def render(frame, calculator, buttons, selector, pointer=None, hover=None,
     cv2.rectangle(image, (0, 620), (799, HEIGHT), (29, 25, 22), -1)
     status = "PAUSA: pulsa espacio para continuar" if paused else selector.status
     text(image, status, (26, 652), .65, (180, 231, 255))
-    text(image, "ESPACIO: pausa    Q / ESC: salir", (26, 686), .55)
+    text(image, "M: cambiar modo   ESPACIO: pausa   Q / ESC: salir", (26, 686), .49)
     text(image, f"{fps:.0f} FPS", (686, 686), .5)
     if ratio is not None:
         text(image, f"Pinza: {ratio:.2f}", (26, 602), .5)
@@ -97,7 +99,8 @@ def render(frame, calculator, buttons, selector, pointer=None, hover=None,
         text(image, calculator.error, (824, 646), .45, (137, 167, 255))
     else:
         text(image, "Prioridad: * y / antes que + y -", (824, 646), .46, (173, 184, 194))
-    text(image, "Mantener cerrado no repite la pulsacion", (824, 682), .43, (173, 184, 194))
+    hint = "Sal de la tecla antes de volver a pulsarla" if dwell_mode else "Mantener cerrado no repite la pulsacion"
+    text(image, hint, (824, 682), .43, (173, 184, 194))
     if pointer is not None and not paused:
         cv2.circle(image, pointer, 10, (0, 0, 0), 4, cv2.LINE_AA)
         cv2.circle(image, pointer, 10, (180, 231, 255), 2, cv2.LINE_AA)
@@ -117,12 +120,14 @@ def main():
     parser.add_argument("--camera", type=int, default=0, help="Indice de webcam (0 por defecto)")
     parser.add_argument("--close", type=float, default=.35, help="Umbral de cierre normalizado")
     parser.add_argument("--release", type=float, default=.55, help="Umbral de apertura normalizado")
+    parser.add_argument("--mode", choices=("dwell", "pinch"), default="dwell", help="Apuntar (dwell) o pinza (pinch)")
     parser.add_argument("--preview", metavar="PNG", help="Guarda una vista sin abrir la camara")
     args = parser.parse_args()
     try:
-        selector = PinchSelector(close=args.close, release=args.release)
+        pinch_selector = PinchSelector(close=args.close, release=args.release)
     except ValueError as error:
         parser.error(str(error))
+    selector = DwellSelector() if args.mode == "dwell" else pinch_selector
     calculator, buttons = Calculator(), make_buttons()
     if args.preview:
         calculator.expression = "12+3*4"
@@ -164,12 +169,15 @@ def main():
                         landmarks = result.multi_hand_landmarks[0]
                         target = (int(landmarks.landmark[8].x * WIDTH),
                                   int(landmarks.landmark[8].y * HEIGHT))
+                        ratio = pinch_ratio(landmarks.landmark, WIDTH, HEIGHT)
+                        # Cerrar la pinza mueve el índice: conserva el objetivo ya armado.
+                        freeze = (isinstance(selector, PinchSelector) and selector.armed
+                                  and ratio is not None and ratio < selector.release)
                         if pointer is None:
                             pointer = target
-                        else:
+                        elif not freeze:
                             alpha = 1 - np.exp(-min(elapsed, .2) / .045)
                             pointer = tuple(int(a + alpha * (b - a)) for a, b in zip(pointer, target))
-                        ratio = pinch_ratio(landmarks.landmark, WIDTH, HEIGHT)
                         hover = next((b.value for b in buttons if b.contains(pointer)), None)
                         mp.solutions.drawing_utils.draw_landmarks(frame, landmarks, hands_api.HAND_CONNECTIONS)
                     else:
@@ -186,6 +194,10 @@ def main():
                     break
                 if key == ord(" "):
                     paused = not paused
+                    selector.reset()
+                    pointer = None
+                if key == ord("m"):
+                    selector = pinch_selector if isinstance(selector, DwellSelector) else DwellSelector()
                     selector.reset()
                     pointer = None
     finally:
