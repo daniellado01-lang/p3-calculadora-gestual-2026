@@ -95,7 +95,9 @@ El evaluador reconoce únicamente números y cuatro operadores, con precedencia 
 uv run python -m unittest discover -s tests -v
 ```
 
-Se han comprobado las operaciones, prioridad, errores, edición, bloqueo de repeticiones, cambios de objetivo, pérdida de seguimiento y permanencia. También se han procesado 20 fotogramas de la webcam 0 con MediaPipe en el equipo Windows. Estas comprobaciones no sustituyen una prueba manual de todos los gestos en las condiciones de la defensa.
+Las **16 pruebas automáticas** pasan: operaciones, prioridad, errores, edición, bloqueo de repeticiones, cambios de objetivo, pérdida de seguimiento, permanencia y flujo de selección hasta cálculo. También se han procesado 20 fotogramas de la webcam 0 con MediaPipe en el equipo Windows y se ha comprobado la compatibilidad de las 26 dependencias instaladas.
+
+En la prueba manual del 9/11/2026, el usuario señaló dificultad para pulsar con pinza. Tras añadir el modo de permanencia, confirmó que pudo completar `2+3=` y obtener `5`. La pinza mejorada aún requiere validación manual. Estas comprobaciones no sustituyen una prueba manual de todas las operaciones en las condiciones de la defensa.
 
 Recorrido manual recomendado: `2+3=5`, `9-12=-3`, `6*7=42`, `8/4=2`, `0.1+0.2=0.3`, `1/0` (error), corregir con BORRAR, RESET y escribir `11` saliendo de la tecla entre pulsaciones. Probar pausa, retirar la mano y ambos modos.
 
